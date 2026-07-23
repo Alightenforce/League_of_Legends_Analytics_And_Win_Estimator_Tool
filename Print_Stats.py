@@ -58,7 +58,7 @@ class Print_Stats:
 
     def print_average_kda_per_champion(self, summoner_name, count, average_kda_per_champion):
         print("--------------------")
-        print(f"{summoner_name}'s average KDA per champion over the last {count} games):")
+        print(f"{summoner_name}'s average KDA per champion over the last {count} games:")
         for champion_name, data in average_kda_per_champion.items():
             print(f"{champion_name}: {data['Avg_KDA']} KDA | {data['Avg_Kills']}/{data['Avg_Deaths']}/{data['Avg_Assists']}")
         print("--------------------")

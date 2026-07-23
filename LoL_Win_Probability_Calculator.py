@@ -1,7 +1,12 @@
 from Player_Class import Player
 
 def main():
-    player1 = Player("Alightenforce", "4040", "europe", 5)
+    player1 = Player("Alightenforce", "4040", "europe", 250)
+    player1.update_profile()
+    player1.print_win_rate()
+    player1.print_win_rate_per_champion()
+    player1.print_average_kda_per_champion()
+    player1.print_champion_name_to_champion_mastery()
    #  player1.update_profile()
    #  player1.print_player_data()
    #  player1.print_player_data()
@@ -11,15 +16,15 @@ def main():
    #  player1.print_win_rate_per_champion()
    #  player1.print_win_rate_per_champion()
    #  player1.print_average_kda_per_champion()
-    player2 = Player("Sloppy", "BOMB", "europe", 5)
-    player2.update_profile()
+    #player2 = Player("Sloppy", "BOMB", "europe", 5)
+    #player2.update_profile()
     # player2.print_player_data()
     # player2.print_side_bans()
     # print(player2.get_all_player_info_in_current_match())
     # print(player2.sort_current_match_champions_into_teams())
     # print(player2.get_champion_and_player_on_each_team_in_current_match())
     # player2.print_champions_in_current_match()
-    print(player2.print_live_player_champion())
+    #print(player2.print_win_rate())
 
 if __name__ == "__main__":
     main()
