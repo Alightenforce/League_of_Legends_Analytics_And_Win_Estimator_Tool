@@ -89,7 +89,7 @@ class Player:
                 data = self.api.get_match_detail(self.region, match_id)
                 DB.save_match_data(self.puuid, data, self.summoner_name, self.summoner_tag, self.region)
                 new_api_calls_made += 1
-                print (f"Fetching uncached match, current new API calls: {new_api_calls_made}")
+                # print (f"Fetching uncached match, current new API calls: {new_api_calls_made}")
             else:
                 print ("API budget exceeded, skipping remaining uncached games")
                 continue
