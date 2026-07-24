@@ -1,12 +1,19 @@
-from Player_Class import Player
+from Player import Player
 
 def main():
-    player1 = Player("Alightenforce", "4040", "europe", 250)
+    player1 = Player("Alightenforce", "4040", "europe", 50)
     player1.update_profile()
-    player1.print_win_rate()
-    player1.print_win_rate_per_champion()
-    player1.print_average_kda_per_champion()
-    player1.print_champion_name_to_champion_mastery()
+    # player1.print_win_rate()
+    # list = player1.determine_win_rate_with_person_on_team()
+    # for player in list.values():
+    #     print(player)
+    # print(player1.calculate_win_rate_with_each_person_on_team())
+    player1.print_winrate_with_allies()
+    player1.print_winrate_of_enemies_against_player()
+    #player1.get_all_player_info_in_match()
+    # player1.print_win_rate_per_champion()
+    # player1.print_average_kda_per_champion()
+    # player1.print_champion_name_to_champion_mastery()
    #  player1.update_profile()
    #  player1.print_player_data()
    #  player1.print_player_data()

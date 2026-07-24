@@ -14,7 +14,6 @@ from io import BytesIO
 import DB
 from Riot_API import Riot_API
 from Print_Stats import Print_Stats
-from pyarrow.types import is_unicode
 
 load_dotenv()
 API_KEY = os.getenv("RIOT_API_KEY")
@@ -70,8 +69,8 @@ class Player:
     ###################################################### Win Rate ##########################################################
 
     def get_player_stats_from_previous_matches(self) -> list:
-        data = self.api.get_match_ids(self.region, self.puuid, self.total_matches_wanted)
-        each_match_data_for_player = self.get_each_match_data_for_player(data)
+        match_history = self.api.get_match_ids(self.region, self.puuid, self.total_matches_wanted)
+        each_match_data_for_player = self.get_each_match_data_for_player(match_history)
         return each_match_data_for_player
 
     def get_win_rate(self) -> float:
@@ -79,6 +78,22 @@ class Player:
         return self.calculate_win_rate(each_match_data_for_player)
 
     def get_each_match_data_for_player(self, match_history: list) -> list[list]:
+        matches_data_for_player = []
+        raw_matches = self.get_each_match_data(match_history)
+        for data in raw_matches:
+            found_player = False
+            for participant in data['info']['participants']:
+                if participant.get('puuid') == self.puuid:
+                    matches_data_for_player.append(participant)
+                    found_player = True
+                    break
+
+            # Likely corrupted game
+            if not found_player:
+                print(f'Could not find PUUID in match {data["metadata"]["matchId"]} (Skipping)')
+        return matches_data_for_player
+
+    def get_each_match_data(self, match_history : list) -> list:
         match_data = []
         new_api_calls_made = 0
         for match_id in match_history:
@@ -93,17 +108,7 @@ class Player:
             else:
                 print ("API budget exceeded, skipping remaining uncached games")
                 continue
-            found_player = False
-            for participant in data['info']['participants']:
-                if participant.get('puuid') == self.puuid:
-                    match_data.append(participant)
-                    found_player = True
-                    break
-
-            # Likely corrupted game
-            if not found_player:
-                print(f'Could not find PUUID in match {match_id} (Skipping)')
-
+            match_data.append(data)
         return match_data
 
     def calculate_win_rate(self, each_match_data: list) -> float:
@@ -161,7 +166,7 @@ class Player:
 ###################################################### Mastery ##########################################################
 
 ###################################################### Live Match ##########################################################
-    def get_all_player_info_in_current_match(self) -> dict:
+    def get_all_player_info_in_live_match(self) -> dict:
         player_info_dict = {}
         data = self.api.get_active_game(self.region_code, self.puuid)
         participants = data["participants"]
@@ -173,41 +178,42 @@ class Player:
             }
         return player_info_dict
 
-    def sort_current_match_champions_into_teams(self) -> dict:
-        player_info_dict = self.get_all_player_info_in_current_match()
-        teams = {"blue_team" : [] , "red_team" : []}
+    def sort_current_match_champions_into_teams(self, player_info_dict : dict) -> dict:
+        teams = {"blue_team" : {} , "red_team" : {}}
         for puuid, data in player_info_dict.items():
             if data["team_id"] == BLUE_SIDE_ID:
-                teams["blue_team"].append(data)
+                teams["blue_team"][puuid] = data
             else:
-                teams["red_team"].append(data)
+                teams["red_team"][puuid] = data
         return teams
 
-
-    def get_champion_and_player_on_each_team_in_current_match(self) -> dict:
-        player_info_dict = self.sort_current_match_champions_into_teams()
+    def sort_team_to_player_name_and_champion_in_live_match(self, player_info_dict : dict):
+        player_info_dict = self.sort_current_match_champions_into_teams(player_info_dict)
         dict_of_champions = self.find_champion_ids_to_names()
-        team_to_player_name_and_champion_dict = {"blue_team" : [] , "red_team" : []}
-        for team, data_list in player_info_dict.items():
-            for data in data_list:
+        team_to_player_name_and_champion_dict = {"blue_team" : {} , "red_team" : {}}
+        for team, players_in_team in player_info_dict.items():
+            for puuid, data in players_in_team.items():
                 champion_id = data["champion_id"]
-                username = data["riot_id"]
+                username = data.get("riot_id") or data.get("riot_id_game_name")
                 champion_name = dict_of_champions[champion_id]
                 player_pairing = {
                     "username": username,
                     "champion_name": champion_name
                 }
 
-                team_to_player_name_and_champion_dict[team].append(player_pairing)
-
+                team_to_player_name_and_champion_dict[team][puuid].append(player_pairing)
         return team_to_player_name_and_champion_dict
 
+    def get_champion_and_player_on_each_team_in_live_match(self) -> dict:
+        live_player_info = self.get_all_player_info_in_live_match()
+        return self.sort_team_to_player_name_and_champion_in_live_match(live_player_info)
+
     def print_champions_in_current_match(self):
-        match_data = self.get_champion_and_player_on_each_team_in_current_match()
+        match_data = self.get_champion_and_player_on_each_team_in_live_match()
         self.print_stats.print_champions_in_current_match(match_data)
 
     def get_live_player_champion (self) -> str:
-        team_to_player_name_and_champion_dict = self.get_champion_and_player_on_each_team_in_current_match()
+        team_to_player_name_and_champion_dict = self.get_champion_and_player_on_each_team_in_live_match()
         for team, data_list in team_to_player_name_and_champion_dict.items():
             for data in data_list:
                 if self.summoner_name + "#" + self.summoner_tag == data["username"]:
@@ -319,6 +325,165 @@ class Player:
         self.print_stats.print_average_kda_per_champion(self.summoner_name, len(self.match_data), self.get_average_kda_per_champion())
 
 ###################################################### Champion Specific ##########################################################
+
+###################################################### Lobby Specific ##########################################################
+    def get_all_player_info_in_previous_matches(self) -> list[dict]:
+        all_matches_team_info = []
+        match_history = self.api.get_match_ids(self.region, self.puuid, self.total_matches_wanted)
+        matches_data = self.get_each_match_data(match_history)
+        for match in matches_data:
+            single_match = {}
+            participants = match["info"]["participants"]
+            for participant in participants:
+                single_match[participant["puuid"]] = {
+                    "riot_id_game_name": participant["riotIdGameName"],
+                    "riot_id_tag_line": participant["riotIdTagline"],
+                    "champion_id": participant["championId"],
+                    "team_id": participant["teamId"],
+                    "has_won": participant["win"]
+                }
+            all_matches_team_info.append(single_match)
+        return all_matches_team_info
+
+    def sort_all_previous_matches_into_teams(self) -> list:
+        all_matches_team_info = self.get_all_player_info_in_previous_matches()
+        sorted_teams = []
+        for match in all_matches_team_info:
+            sorted_teams.append(self.sort_current_match_champions_into_teams(match))
+        return sorted_teams
+
+    def determine_current_player_team(self, match: dict, dont_want_opposite_team: bool) -> int:
+        if self.puuid in match["blue_team"] and dont_want_opposite_team:
+            return BLUE_SIDE_ID
+        elif self.puuid in match["blue_team"] and not dont_want_opposite_team:
+            return RED_SIDE_ID
+        elif self.puuid in match["red_team"] and dont_want_opposite_team:
+            return RED_SIDE_ID
+        elif self.puuid in match["red_team"]and not dont_want_opposite_team:
+            return BLUE_SIDE_ID
+        else:
+            return None
+
+    def get_players_teams_data(self) -> list:
+        dont_want_opposite_team = True
+        all_players_previous_teams_data = self.get_certain_teams_data(dont_want_opposite_team)
+        return all_players_previous_teams_data
+
+    def get_enemy_teams_data(self) -> list:
+        dont_want_opposite_team = False
+        all_enemy_previous_teams_data = self.get_certain_teams_data(dont_want_opposite_team)
+        return all_enemy_previous_teams_data
+
+    def get_certain_teams_data(self, dont_want_opposite_team: bool) -> list:
+        all_previous_teams_data = []
+        sorted_teams = self.sort_all_previous_matches_into_teams()
+        for match in sorted_teams:
+            current_players_side = self.determine_current_player_team(match, dont_want_opposite_team)
+            if current_players_side == BLUE_SIDE_ID:
+                team_key = "blue_team"
+            elif current_players_side == RED_SIDE_ID:
+                team_key = "red_team"
+            else:
+                continue
+            team_data = match[team_key]
+            all_previous_teams_data.append(team_data)
+        return all_previous_teams_data
+
+    def determine_win_rate_of_each_person(self, dont_want_opposite_team: bool) -> dict:
+        current_player_history_with_other_teammates = {self.puuid: {}}
+        if dont_want_opposite_team:
+            all_previous_teams_data = self.get_players_teams_data()
+        else:
+            all_previous_teams_data = self.get_enemy_teams_data()
+        for team_players in all_previous_teams_data:
+            for puuid in team_players:
+                if puuid == self.puuid:
+                    continue
+                if puuid not in current_player_history_with_other_teammates[self.puuid]:
+                    current_player_history_with_other_teammates[self.puuid][puuid] = {"wins": 0, "losses": 0}
+                if team_players[puuid]["has_won"]:
+                    current_player_history_with_other_teammates[self.puuid][puuid]["wins"] += 1
+                else:
+                    current_player_history_with_other_teammates[self.puuid][puuid]["losses"] += 1
+        return current_player_history_with_other_teammates
+
+    def calculate_win_rate_of_each_person(self, dont_want_opposite_team: bool ) -> dict:
+        teammate_puuid_to_stats = {}
+        current_player_history_with_other_teammates = self.determine_win_rate_of_each_person(dont_want_opposite_team)
+        for player_puuid, teammates_puuid in current_player_history_with_other_teammates.items():
+            for teammate_puuid, stats in teammates_puuid.items():
+                wins = stats["wins"]
+                losses = stats["losses"]
+                total_matches = wins + losses
+
+                win_rate = wins / total_matches
+                win_rate_percent = round(win_rate * 100, 1)
+                teammate_puuid_to_stats[teammate_puuid] = {
+                    "wins": wins,
+                    "losses": losses,
+                    "winrate": win_rate_percent,
+                    "total_matches": total_matches
+                }
+        return teammate_puuid_to_stats
+
+    def calculate_win_rate_of_each_person_on_team(self):
+        dont_want_opposite_team = True
+        teammate_puuid_to_stats = self.calculate_win_rate_of_each_person(dont_want_opposite_team)
+        return teammate_puuid_to_stats
+
+    def calculate_win_rate_of_each_person_on_enemy_team(self):
+        dont_want_opposite_team = False
+        enemy_puuid_to_stats = self.calculate_win_rate_of_each_person(dont_want_opposite_team)
+        return enemy_puuid_to_stats
+
+    def map_puuid_to_summoner_id(self, dont_want_opposite_team: bool) -> dict:
+        puuid_to_summoner_ids = {}
+        if dont_want_opposite_team:
+            all_previous_teams_data = self.get_players_teams_data()
+        else:
+            all_previous_teams_data = self.get_enemy_teams_data()
+        for player in all_previous_teams_data:
+            for puuid, data in player.items():
+                if puuid == self.puuid:
+                    continue
+                summoner_id = data["riot_id_game_name"] + "#" + data["riot_id_tag_line"]
+                puuid_to_summoner_ids[puuid] = summoner_id
+        return puuid_to_summoner_ids
+
+    # Avoid using a double nested for loop by using get
+    def map_summoner_id_to_stats(self, dont_want_opposite_team: bool) -> dict:
+        summoner_id_to_stats = {}
+        if dont_want_opposite_team:
+            puuid_to_stats = self.calculate_win_rate_of_each_person_on_team()
+        else:
+            puuid_to_stats = self.calculate_win_rate_of_each_person_on_enemy_team()
+        puuid_to_summoner_ids = self.map_puuid_to_summoner_id(dont_want_opposite_team)
+        for puuid, stats in puuid_to_stats.items():
+            summoner_id = puuid_to_summoner_ids.get(puuid)
+            summoner_id_to_stats[summoner_id] = stats
+        return summoner_id_to_stats
+
+    def get_stats_with_allies(self):
+        dont_want_opposite_team = True
+        summoner_id_to_stats = self.map_summoner_id_to_stats(dont_want_opposite_team)
+        return summoner_id_to_stats
+
+    def get_stats_of_enemies_against_player(self):
+        dont_want_opposite_team = False
+        summoner_id_to_stats = self.map_summoner_id_to_stats(dont_want_opposite_team)
+        return summoner_id_to_stats
+
+    def print_winrate_with_allies(self):
+        self.print_stats.print_win_rate_with_certain_teammates(self.get_stats_with_allies())
+
+    def print_winrate_of_enemies_against_player(self):
+        self.print_stats.print_win_rate_of_enemies_against_player(self.get_stats_of_enemies_against_player())
+
+
+    # def determine_win_rate_against_all_enemy_champions(self):
+    # def determine_win_rate_with_all_ally_champions(self):
+
+    ###################################################### Lobby Specific ##########################################################
 
     def display_summoner_pfp_img(self):
         page = self.api.get_account_data(self.region_code, self.summoner_name, self.summoner_tag)

@@ -1,11 +1,5 @@
-import requests
 import os
 from dotenv import load_dotenv
-import json
-import time
-import climage
-from PIL import Image
-from io import BytesIO
 
 class Print_Stats:
 
@@ -51,7 +45,7 @@ class Print_Stats:
 
     def print_win_rate_per_champion(self, summoner_name, count, win_rate_per_champion):
         print("--------------------")
-        print(f"{summoner_name}'s win rate per champion over the last {count} games):")
+        print(f"{summoner_name}'s win rate per champion over the last {count} games:")
         for champion_name, data in win_rate_per_champion.items():
             print(f"{champion_name}: {data['Win_Rate']}% over {data['Total_Matches']} game(s)")
         print("--------------------")
@@ -81,3 +75,37 @@ class Print_Stats:
 
     def print_live_player_champion(self, champion_name):
         print (f"Player's current champion: {champion_name}")
+
+    def print_win_rate_with_certain_teammates(self, allies_dict):
+        print("--------------------")
+        choice = input("Show only >1 match? (y or n): ")
+        print ("Your winrate with these teammates are: ")
+        for name, stats in allies_dict.items():
+            winrate = stats["winrate"]
+            wins = stats["wins"]
+            losses = stats["losses"]
+            total_matches = stats["total_matches"]
+            if choice == "y":
+                if total_matches > 1:
+                    print(f"{name}: {winrate}% over {total_matches} matche(s) ({wins}W, {losses}L)")
+                else:
+                    continue
+            else:
+                print(f"{name}: {winrate}% over {total_matches} matche(s) ({wins}W, {losses}L)")
+
+    def print_win_rate_of_enemies_against_player(self, enemies_dict):
+        print("--------------------")
+        choice = input("Show only >1 match? (y or n): ")
+        print ("The enemy players' winrate against you are: ")
+        for name, stats in enemies_dict.items():
+            winrate = stats["winrate"]
+            wins = stats["wins"]
+            losses = stats["losses"]
+            total_matches = stats["total_matches"]
+            if choice == "y":
+                if total_matches > 1:
+                    print(f"{name}: {winrate}% over {total_matches} match(es) ({wins}W, {losses}L)")
+                else:
+                    continue
+            else:
+                print(f"{name}: {winrate}% over {total_matches} match(es) ({wins}W, {losses}L)")

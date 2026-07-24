@@ -1,11 +1,6 @@
 import requests
 import os
 from dotenv import load_dotenv
-import json
-import time
-import climage
-from PIL import Image
-from io import BytesIO
 
 class Riot_API:
 
