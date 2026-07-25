@@ -92,6 +92,7 @@ class Print_Stats:
                     continue
             else:
                 print(f"{name}: {winrate}% over {total_matches} matche(s) ({wins}W, {losses}L)")
+        print("--------------------")
 
     def print_win_rate_of_enemies_against_player(self, enemies_dict):
         print("--------------------")
@@ -109,3 +110,38 @@ class Print_Stats:
                     continue
             else:
                 print(f"{name}: {winrate}% over {total_matches} match(es) ({wins}W, {losses}L)")
+        print("--------------------")
+
+    def print_win_rate_with_all_ally_champions(self, win_rate_with_all_ally_champions: dict, total_matches_wanted : int):
+        print("--------------------")
+        print (f"Your winrate with these ally champions are: (in {total_matches_wanted} matches)")
+        for name, stats in win_rate_with_all_ally_champions.items():
+            winrate = stats["winrate"]
+            wins = stats["wins"]
+            losses = stats["losses"]
+            total_matches = stats["total_matches"]
+            print (f"{name} has a {winrate}% win rate ({wins}W, {losses}L) over {total_matches} matches")
+        print("--------------------")
+
+    def print_win_rate_of_enemy_champions_against_player(self, win_rate_of_enemy_champions_against_player: dict, total_matches_wanted : int):
+        print("--------------------")
+        print (f"The enemy champions' winrate against you are: (in {total_matches_wanted} matches)")
+        for name, stats in win_rate_of_enemy_champions_against_player.items():
+            winrate = stats["winrate"]
+            wins = stats["wins"]
+            losses = stats["losses"]
+            total_matches = stats["total_matches"]
+            print (f"{name} has a {winrate}% win rate ({wins}W, {losses}L) over {total_matches} matches")
+        print("--------------------")
+
+    def print_win_rate_of_player_against_enemy_champion(self, win_rate_of_enemy_champions_against_player: dict, total_matches_wanted : int):
+        print("--------------------")
+        print (f"Your winrate against these enemy champions are: (in {total_matches_wanted} matches)")
+        for name, stats in win_rate_of_enemy_champions_against_player.items():
+            winrate = stats["winrate"]
+            wins = stats["wins"]
+            losses = stats["losses"]
+            total_matches = stats["total_matches"]
+            player_win_rate = round(100-winrate, 2)
+            print (f"{name} has a {player_win_rate}% win rate ({losses}W, {wins}L) over {total_matches} matches")
+        print("--------------------")

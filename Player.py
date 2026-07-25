@@ -390,22 +390,22 @@ class Player:
         return all_previous_teams_data
 
     def determine_win_rate_of_each_person(self, dont_want_opposite_team: bool) -> dict:
-        current_player_history_with_other_teammates = {self.puuid: {}}
+        current_player_history_with_players = {self.puuid: {}}
         if dont_want_opposite_team:
             all_previous_teams_data = self.get_players_teams_data()
         else:
             all_previous_teams_data = self.get_enemy_teams_data()
-        for team_players in all_previous_teams_data:
-            for puuid in team_players:
+        for players in all_previous_teams_data:
+            for puuid in players:
                 if puuid == self.puuid:
                     continue
-                if puuid not in current_player_history_with_other_teammates[self.puuid]:
-                    current_player_history_with_other_teammates[self.puuid][puuid] = {"wins": 0, "losses": 0}
-                if team_players[puuid]["has_won"]:
-                    current_player_history_with_other_teammates[self.puuid][puuid]["wins"] += 1
+                if puuid not in current_player_history_with_players[self.puuid]:
+                    current_player_history_with_players[self.puuid][puuid] = {"wins": 0, "losses": 0}
+                if players[puuid]["has_won"]:
+                    current_player_history_with_players[self.puuid][puuid]["wins"] += 1
                 else:
-                    current_player_history_with_other_teammates[self.puuid][puuid]["losses"] += 1
-        return current_player_history_with_other_teammates
+                    current_player_history_with_players[self.puuid][puuid]["losses"] += 1
+        return current_player_history_with_players
 
     def calculate_win_rate_of_each_person(self, dont_want_opposite_team: bool ) -> dict:
         teammate_puuid_to_stats = {}
@@ -479,9 +479,92 @@ class Player:
     def print_winrate_of_enemies_against_player(self):
         self.print_stats.print_win_rate_of_enemies_against_player(self.get_stats_of_enemies_against_player())
 
+    def sort_champions_into_corresponding_teams(self, dont_want_opposite_team: bool) -> list[dict]:
+        all_matches_team_data = self.get_certain_teams_data(dont_want_opposite_team)
+        list_of_team_side_to_champion=[]
+        for matches in all_matches_team_data:
+            team_side_to_champion = {}
+            for puuid, stats in matches.items():
+                if puuid == self.puuid:
+                    continue
+                team_id = stats["team_id"]
+                has_won = stats["has_won"]
+                champion_id = stats["champion_id"]
 
-    # def determine_win_rate_against_all_enemy_champions(self):
-    # def determine_win_rate_with_all_ally_champions(self):
+                if team_id not in team_side_to_champion:
+                    team_side_to_champion[team_id] = {
+                        "has_won": has_won,
+                        "champion_ids": []
+                    }
+                team_side_to_champion[team_id]["champion_ids"].append(champion_id)
+            list_of_team_side_to_champion.append(team_side_to_champion)
+        return list_of_team_side_to_champion
+
+    def determine_win_rate_of_champion_with_or_against_player(self, dont_want_opposite_team: bool) -> dict:
+        champion_id_to_winrate = {}
+        list_of_team_side_to_champion = self.sort_champions_into_corresponding_teams(dont_want_opposite_team)
+        for team in list_of_team_side_to_champion:
+            for team_id, champion_ids_and_has_won in team.items():
+                has_won = champion_ids_and_has_won["has_won"]
+                champion_id_list = champion_ids_and_has_won["champion_ids"]
+                for champion_id in champion_id_list:
+                    if champion_id not in champion_id_to_winrate:
+                        champion_id_to_winrate[champion_id] = {
+                            "wins" : 0,
+                            "losses" : 0,
+                            "total_matches" : 0
+                        }
+                    if has_won:
+                        champion_id_to_winrate[champion_id]["wins"] += 1
+                        champion_id_to_winrate[champion_id]["total_matches"] += 1
+                    else:
+                        champion_id_to_winrate[champion_id]["losses"] += 1
+                        champion_id_to_winrate[champion_id]["total_matches"] += 1
+        return champion_id_to_winrate
+
+    def calculate_win_rate_of_champion_with_or_against_player(self, dont_want_opposite_team: bool) -> dict:
+        champion_id_to_winrate = self.determine_win_rate_of_champion_with_or_against_player(dont_want_opposite_team)
+        for champion_id, stats in champion_id_to_winrate.items():
+            wins = stats["wins"]
+            losses = stats["losses"]
+            total_matches = stats["total_matches"]
+            win_rate = wins / total_matches
+            win_rate_percent = round(win_rate * 100, 1)
+            champion_id_to_winrate[champion_id] ={
+                "wins" : wins,
+                "losses" : losses,
+                "winrate" : win_rate_percent,
+                "total_matches" : total_matches
+            }
+        return champion_id_to_winrate
+
+    def map_champion_id_to_name_for_previous_matches(self, dont_want_opposite_team: bool) -> dict:
+        champion_name_to_stats = {}
+        champion_id_to_stats = self.calculate_win_rate_of_champion_with_or_against_player(dont_want_opposite_team)
+        dictionary_of_champion_ids_and_names = self.find_champion_ids_to_names()
+        for champion_id, stats in champion_id_to_stats.items():
+            champion_name = dictionary_of_champion_ids_and_names[champion_id]
+            champion_name_to_stats[champion_name] = stats
+        return champion_name_to_stats
+
+    def determine_win_rate_of_enemy_champions_against_player(self):
+        dont_want_opposite_team = False
+        win_rate_of_enemy_champions_against_player = self.map_champion_id_to_name_for_previous_matches(dont_want_opposite_team)
+        return win_rate_of_enemy_champions_against_player
+
+    def determine_win_rate_with_all_ally_champions(self):
+        dont_want_opposite_team = True
+        win_rate_with_ally_champions = self.map_champion_id_to_name_for_previous_matches(dont_want_opposite_team)
+        return win_rate_with_ally_champions
+
+    def print_win_rate_with_all_ally_champions(self):
+        self.print_stats.print_win_rate_with_all_ally_champions(self.determine_win_rate_with_all_ally_champions(), self.total_matches_wanted)
+
+    def print_win_rate_of_enemy_champions_against_player(self):
+        self.print_stats.print_win_rate_of_enemy_champions_against_player(self.determine_win_rate_of_enemy_champions_against_player(), self.total_matches_wanted)
+
+    def print_win_rate_of_player_against_enemy_champion(self):
+        self.print_stats.print_win_rate_of_player_against_enemy_champion(self.determine_win_rate_of_enemy_champions_against_player(), self.total_matches_wanted)
 
     ###################################################### Lobby Specific ##########################################################
 

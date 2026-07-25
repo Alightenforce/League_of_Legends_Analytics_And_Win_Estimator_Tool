@@ -64,8 +64,8 @@ class Riot_API:
 
     def get_json(self, link : str):
         response = self.session.get(link)
-        # app_calls = response.headers.get("X-App-Rate-Limit-Count")
-        # print(f"[Riot API Usage] -> {app_calls}")
+        app_calls = response.headers.get("X-App-Rate-Limit-Count")
+        print(f"[Riot API Usage] -> {app_calls}")
         return response.json()
 
     def get_most_recent_version(self):
