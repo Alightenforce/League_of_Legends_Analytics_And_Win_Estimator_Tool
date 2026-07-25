@@ -1,7 +1,3 @@
-# TO DO
-# CYCLE THROUGH PREVIOUS MATCHES
-# MAKE A TALLY OF W/L AGAINST CERTAIN CHAMPIONS, AGAINST CERTAIN PEOPLE AND WITH CERTAIN PEOPLE
-
 import requests
 import os
 from dotenv import load_dotenv
@@ -33,7 +29,8 @@ class Player:
 
         self.version_number = None
         self.champion_lookup = None
-        self.match_data = None
+        self.match_data_for_player = None
+        self.match_history = None
 
         self.api = Riot_API()
         self.print_stats= Print_Stats()
@@ -52,16 +49,22 @@ class Player:
         self.summoner_level = data["summonerLevel"]
         self.pfp_id = data["profileIconId"]
         self.version_number = self.api.get_most_recent_version()
+        self.match_history = self.get_match_history()
 
     def fetch_champion_lookup(self):
         if self.champion_lookup is None:
             self.champion_lookup = self.api.get_champion_data(self.version_number)
         return self.champion_lookup
 
-    def fetch_match_data(self):
-        if self.match_data is None:
-            self.match_data = self.get_player_stats_from_previous_matches()
-        return self.match_data
+    def get_match_history(self):
+        if self.match_history is None:
+            self.match_history = self.api.get_match_ids(self.region, self.puuid, self.total_matches_wanted)
+        return self.match_history
+
+    def fetch_match_data_for_player(self):
+        if self.match_data_for_player is None:
+            self.match_data_for_player = self.get_player_stats_from_previous_matches()
+        return self.match_data_for_player
 
     def print_player_data(self):
         self.print_stats.print_player_data(self)
@@ -69,12 +72,12 @@ class Player:
     ###################################################### Win Rate ##########################################################
 
     def get_player_stats_from_previous_matches(self) -> list:
-        match_history = self.api.get_match_ids(self.region, self.puuid, self.total_matches_wanted)
+        match_history = self.get_match_history()
         each_match_data_for_player = self.get_each_match_data_for_player(match_history)
         return each_match_data_for_player
 
     def get_win_rate(self) -> float:
-        each_match_data_for_player = self.fetch_match_data()
+        each_match_data_for_player = self.fetch_match_data_for_player()
         return self.calculate_win_rate(each_match_data_for_player)
 
     def get_each_match_data_for_player(self, match_history: list) -> list[list]:
@@ -124,7 +127,7 @@ class Player:
         return round(win_rate_percent, 2)
 
     def print_win_rate(self):
-        self.print_stats.print_win_rate(self.summoner_name, self.get_win_rate(), len(self.match_data))
+        self.print_stats.print_win_rate(self.summoner_name, self.get_win_rate(), len(self.match_data_for_player))
 
 ###################################################### Win Rate ##########################################################
 
@@ -163,12 +166,18 @@ class Player:
     def print_champion_name_to_champion_mastery(self):
         self.print_stats.print_champion_name_to_champion_mastery(self.get_champion_name_to_champion_mastery().items())
 
+
 ###################################################### Mastery ##########################################################
 
 ###################################################### Live Match ##########################################################
     def get_all_player_info_in_live_match(self) -> dict:
         player_info_dict = {}
-        data = self.api.get_active_game(self.region_code, self.puuid)
+        try:
+            data = self.api.get_active_game(self.region_code, self.puuid)
+        except:
+            print("Player is not in a live game or API call failed.")
+            return player_info_dict
+
         participants = data["participants"]
         for participant in participants:
             player_info_dict[participant["puuid"]] = {
@@ -194,15 +203,39 @@ class Player:
         for team, players_in_team in player_info_dict.items():
             for puuid, data in players_in_team.items():
                 champion_id = data["champion_id"]
-                username = data.get("riot_id") or data.get("riot_id_game_name")
+                username = data["riot_id"]
                 champion_name = dict_of_champions[champion_id]
-                player_pairing = {
+                team_to_player_name_and_champion_dict[team][puuid] = {
                     "username": username,
-                    "champion_name": champion_name
+                    "champion_name": champion_name,
+                    "champion_id": champion_id
                 }
-
-                team_to_player_name_and_champion_dict[team][puuid].append(player_pairing)
         return team_to_player_name_and_champion_dict
+
+    def get_all_masteries_in_live_match(self):
+        team_to_puuid_to_stats = {"blue_team" : {}, "red_team" : {}}
+        champion_and_player_in_live_match = self.get_champion_and_player_on_each_team_in_live_match()
+        for team, players in champion_and_player_in_live_match.items():
+            for puuid, player_data in players.items():
+                target_champ_id = player_data["champion_id"]
+                mastery_data = self.api.get_mastery_data(self.region_code, puuid)
+                player_champ_mastery = None
+                for champ in mastery_data:
+                    if champ["championId"] == target_champ_id:
+                        player_champ_mastery = champ
+                        break
+
+                team_to_puuid_to_stats[team][puuid] = {
+                    "username": player_data["username"],
+                    "champion_name": player_data["champion_name"],
+                    "champion_id": player_data["champion_id"],
+                    "mastery": player_champ_mastery["championPoints"]
+                }
+        return team_to_puuid_to_stats
+
+    def print_all_masteries_in_live_match(self):
+        self.print_stats.print_all_masteries_in_live_match(self.get_all_masteries_in_live_match())
+
 
     def get_champion_and_player_on_each_team_in_live_match(self) -> dict:
         live_player_info = self.get_all_player_info_in_live_match()
@@ -264,12 +297,15 @@ class Player:
 
 ###################################################### Champion Specific ##########################################################
 
-    def get_player_stats_per_champion(self) -> dict:
+    def get_player_stats_per_champion(self, match_data = None) -> dict:
         dict_of_player_stats_per_champion = {}
-        if self.match_data is None:
-            self.fetch_match_data()
-        each_match_data = self.match_data
+        if match_data is None:
+            if self.match_data_for_player is None:
+                self.fetch_match_data_for_player()
+            match_data = self.match_data_for_player
 
+        each_match_data = match_data
+        print (each_match_data)
         for each_match in each_match_data:
             champion_name = each_match["championName"]
             kills = each_match["kills"]
@@ -299,7 +335,7 @@ class Player:
         return win_rate_per_champion
 
     def print_win_rate_per_champion(self):
-        self.print_stats.print_win_rate_per_champion(self.summoner_name, len(self.match_data), self.calculate_win_rate_per_champion())
+        self.print_stats.print_win_rate_per_champion(self.summoner_name, self.total_matches_wanted, self.calculate_win_rate_per_champion())
 
     def get_average_kda_per_champion(self) -> dict:
         average_kda_per_champion = {}
@@ -322,14 +358,14 @@ class Player:
         return average_kda_per_champion
 
     def print_average_kda_per_champion(self):
-        self.print_stats.print_average_kda_per_champion(self.summoner_name, len(self.match_data), self.get_average_kda_per_champion())
+        self.print_stats.print_average_kda_per_champion(self.summoner_name, self.total_matches_wanted, self.get_average_kda_per_champion())
 
 ###################################################### Champion Specific ##########################################################
 
 ###################################################### Lobby Specific ##########################################################
     def get_all_player_info_in_previous_matches(self) -> list[dict]:
         all_matches_team_info = []
-        match_history = self.api.get_match_ids(self.region, self.puuid, self.total_matches_wanted)
+        match_history = self.get_match_history()
         matches_data = self.get_each_match_data(match_history)
         for match in matches_data:
             single_match = {}

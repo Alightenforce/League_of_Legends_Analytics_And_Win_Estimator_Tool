@@ -145,3 +145,25 @@ class Print_Stats:
             player_win_rate = round(100-winrate, 2)
             print (f"{name} has a {player_win_rate}% win rate ({losses}W, {wins}L) over {total_matches} matches")
         print("--------------------")
+
+    def print_all_masteries_in_live_match(self, team_to_puuid_to_stats : dict):
+        print("--------------------")
+        blue_team_masteries = []
+        red_team_masteries = []
+        for team, players in team_to_puuid_to_stats.items():
+            for puuid, stats in players.items():
+                champion_name = stats["champion_name"]
+                champion_mastery = stats["mastery"]
+                if team == "blue_team":
+                    blue_team_masteries.append((champion_name,champion_mastery))
+                else:
+                    red_team_masteries.append((champion_name,champion_mastery))
+        print("Blue Team Masteries:")
+        for players in blue_team_masteries:
+            print(f"{players[0]} has {players[1]} points")
+        print("--------------------")
+        print("Red Team Masteries:")
+        for players in red_team_masteries:
+            print(f"{players[0]} has {players[1]} points")
+        print("--------------------")
+
