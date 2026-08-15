@@ -28,7 +28,7 @@ Retrieves all the mastery data for that player and matches champion IDs to names
 ### 3. Calculating win rate per champion over X games
 <img width="513" height="1033" alt="ChampionKDAs" src="https://github.com/user-attachments/assets/757b9c2e-8b4e-4a87-b7cb-fdeefb42f360" />  
 
-Goes over each match and determines the champion played and whether the player lost or won on them. Stored in a dictionary  
+Goes over each match and stores the champion played and whether the player lost or won on them in a dictionary. 
 
 ### 4. Calculating average KDA per champion over X games
 <img width="535" height="1038" alt="AvgKDAPerChampion" src="https://github.com/user-attachments/assets/7630a0a9-6562-442c-8188-c43c1f053ff0" />  
