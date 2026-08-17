@@ -3,9 +3,7 @@ import pandas as pd
 
 def main():
     player1 = Player("Sinerias", "EUW", "europe", 1)
-    player2 = Player("FUTA CHOGATH", "50CM", "europe", 1)
     player1.update_profile()
-    player2.update_profile()
     # player1.print_win_rate()
     # player1.print_players_champion_masteries()
     # player1.print_win_rate_per_champion()
