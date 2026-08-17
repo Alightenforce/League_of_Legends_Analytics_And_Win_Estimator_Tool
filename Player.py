@@ -127,7 +127,7 @@ class Player:
         return round(win_rate_percent, 2)
 
     def print_win_rate(self):
-        self.print_stats.print_win_rate(self.summoner_name, self.get_win_rate(), len(self.match_data_for_player))
+        self.print_stats.print_win_rate(self.summoner_name, self.get_win_rate(), self.total_matches_wanted)
 
 ###################################################### Win Rate ##########################################################
 
@@ -163,8 +163,8 @@ class Player:
         name_to_mastery_points = self.match_champion_name_to_champion_mastery(list_of_champion_masteries, dictionary_of_champion_ids_and_names)
         return name_to_mastery_points
 
-    def print_champion_name_to_champion_mastery(self):
-        self.print_stats.print_champion_name_to_champion_mastery(self.get_champion_name_to_champion_mastery().items())
+    def print_players_champion_masteries(self):
+        self.print_stats.print_players_champion_masteries(self.get_champion_name_to_champion_mastery().items())
 
 
 ###################################################### Mastery ##########################################################
@@ -177,10 +177,17 @@ class Player:
         except:
             print("Player is not in a live game or API call failed.")
             return player_info_dict
-
+        # print (data)
         participants = data["participants"]
-        for participant in participants:
-            player_info_dict[participant["puuid"]] = {
+        for index, participant in enumerate(participants):
+            puuid = participant["puuid"]
+            if puuid:
+                player_key = puuid
+            else:
+                player_key = f"Streamer_Mode_{index}"
+
+            player_info_dict[player_key] = {
+                "puuid" : participant["puuid"],
                 "riot_id": participant["riotId"],
                 "champion_id": participant["championId"],
                 "team_id": participant["teamId"]
@@ -212,30 +219,73 @@ class Player:
                 }
         return team_to_player_name_and_champion_dict
 
-    def get_all_masteries_in_live_match(self):
-        team_to_puuid_to_stats = {"blue_team" : {}, "red_team" : {}}
-        champion_and_player_in_live_match = self.get_champion_and_player_on_each_team_in_live_match()
-        for team, players in champion_and_player_in_live_match.items():
+    def get_all_masteries_in_live_match(self, live_teams = None):
+        if live_teams is None:
+            live_teams = self.get_champion_and_player_on_each_team_in_live_match()
+
+        puuid_to_all_masteries = {}
+        for team, players in live_teams.items():
+            for puuid in players:
+                mastery_data = self.api.get_mastery_data(self.region_code, puuid)
+                if "status" in mastery_data:
+                    mastery_data = []
+                puuid_to_all_masteries[puuid] = mastery_data
+
+        return puuid_to_all_masteries
+
+    def get_live_match_champion_masteries(self):
+        live_teams = self.get_champion_and_player_on_each_team_in_live_match()
+        sorted_masteries = self.sort_by_player_main_champions_in_live_match(live_teams)
+
+        team_to_puuid_to_stats = {"blue_team": {}, "red_team": {}}
+
+        for team, players in live_teams.items():
             for puuid, player_data in players.items():
                 target_champ_id = player_data["champion_id"]
-                mastery_data = self.api.get_mastery_data(self.region_code, puuid)
-                player_champ_mastery = None
-                for champ in mastery_data:
-                    if champ["championId"] == target_champ_id:
-                        player_champ_mastery = champ
+                player_champ_list = sorted_masteries.get(puuid, [])
+                points = 0
+                x_most_played_counter = 0
+                for champ in player_champ_list:
+                    x_most_played_counter += 1
+                    if champ["champion_id"] == target_champ_id:
+                        points = champ["mastery"]
                         break
 
                 team_to_puuid_to_stats[team][puuid] = {
                     "username": player_data["username"],
                     "champion_name": player_data["champion_name"],
-                    "champion_id": player_data["champion_id"],
-                    "mastery": player_champ_mastery["championPoints"]
+                    "champion_id": target_champ_id,
+                    "mastery": points,
+                    "x_most_played": x_most_played_counter,
                 }
+
         return team_to_puuid_to_stats
 
-    def print_all_masteries_in_live_match(self):
-        self.print_stats.print_all_masteries_in_live_match(self.get_all_masteries_in_live_match())
+    # Already ordered in size of mastery so there's no need to sort
+    def sort_by_player_main_champions_in_live_match(self, live_teams = None):
+        if live_teams is None:
+            live_teams = self.get_champion_and_player_on_each_team_in_live_match()
+        puuid_to_champion_id_and_level_and_points = {}
+        all_masteries = self.get_all_masteries_in_live_match(live_teams)
 
+        for puuid, all_champion_mastery_of_current_player in all_masteries.items():
+            if "status" in all_champion_mastery_of_current_player:
+                puuid_to_champion_id_and_level_and_points[puuid] = []
+                continue
+            for champions in all_champion_mastery_of_current_player:
+                if puuid not in puuid_to_champion_id_and_level_and_points:
+                    puuid_to_champion_id_and_level_and_points[puuid] = []
+                puuid_to_champion_id_and_level_and_points[puuid].append(
+                    {
+                    "champion_id": champions["championId"],
+                    "mastery": champions["championPoints"],
+                    "champion_level": champions["championLevel"],
+                    }
+                )
+        return puuid_to_champion_id_and_level_and_points
+
+    def print_all_masteries_in_live_match(self):
+        self.print_stats.print_all_masteries_in_live_match(self.get_live_match_champion_masteries())
 
     def get_champion_and_player_on_each_team_in_live_match(self) -> dict:
         live_player_info = self.get_all_player_info_in_live_match()
@@ -305,7 +355,6 @@ class Player:
             match_data = self.match_data_for_player
 
         each_match_data = match_data
-        print (each_match_data)
         for each_match in each_match_data:
             champion_name = each_match["championName"]
             kills = each_match["kills"]
@@ -612,3 +661,4 @@ class Player:
         buffer.seek(0) # Move head back to start after writing
         output = climage.convert(buffer, is_unicode=True, width = 40)
         print(output)
+

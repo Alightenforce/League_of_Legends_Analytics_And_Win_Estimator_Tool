@@ -25,7 +25,7 @@ class Print_Stats:
         print(f"{summoner_name}'s win rate is {win_rate}% over the past {match_count} matches")
         print("--------------------")
 
-    def print_champion_name_to_champion_mastery(self, mastery_dict):
+    def print_players_champion_masteries(self, mastery_dict):
         print("--------------------")
         print("All player's mastery: ")
         for name, points in mastery_dict:
@@ -62,14 +62,13 @@ class Print_Stats:
             if team == "blue_team":
                 print("--------------------")
                 print("Blue Team: ")
-                for data in data_list:
-                        print (f"Username: {data['username']} | Champion Name: {data['champion_name']}")
+                for puuid, data in data_list.items():
+                    print (f"Username: {data['username']} | Champion Name: {data['champion_name']}")
                 print("--------------------")
-
             else:
                 print("--------------------")
                 print ("Red team: ")
-                for data in data_list:
+                for puuid, data in data_list.items():
                     print(f"Username: {data['username']} | Champion: {data['champion_name']}")
                 print("--------------------")
 
@@ -146,24 +145,21 @@ class Print_Stats:
             print (f"{name} has a {player_win_rate}% win rate ({losses}W, {wins}L) over {total_matches} matches")
         print("--------------------")
 
-    def print_all_masteries_in_live_match(self, team_to_puuid_to_stats : dict):
-        print("--------------------")
-        blue_team_masteries = []
-        red_team_masteries = []
-        for team, players in team_to_puuid_to_stats.items():
-            for puuid, stats in players.items():
-                champion_name = stats["champion_name"]
-                champion_mastery = stats["mastery"]
-                if team == "blue_team":
-                    blue_team_masteries.append((champion_name,champion_mastery))
-                else:
-                    red_team_masteries.append((champion_name,champion_mastery))
-        print("Blue Team Masteries:")
-        for players in blue_team_masteries:
-            print(f"{players[0]} has {players[1]} points")
-        print("--------------------")
-        print("Red Team Masteries:")
-        for players in red_team_masteries:
-            print(f"{players[0]} has {players[1]} points")
-        print("--------------------")
+    def print_all_masteries_in_live_match(self, team_to_puuid_to_stats: dict):
+        print("--------------------------------------------------")
+        for team_key, team_label in [
+            ("blue_team", "Blue Team"),
+            ("red_team", "Red Team"),
+        ]:
+            print(f"{team_label} Masteries:")
+            players = team_to_puuid_to_stats.get(team_key, {})
 
+            for puuid, stats in players.items():
+                username = stats.get("username", "Unknown")
+                champ_name = stats.get("champion_name", "Unknown")
+                mastery = stats.get("mastery", 0)
+                rank = stats.get("x_most_played")
+                print(
+                    f"• {username} ({champ_name}): {mastery:,} pts (#{rank} most played)"
+                )
+            print("--------------------------------------------------")
