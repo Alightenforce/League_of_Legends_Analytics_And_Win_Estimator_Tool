@@ -55,6 +55,80 @@ Goes over each match and stores the ally players' champion IDs in a dictionary, 
 
 Same principle as 7
 
+### 9. Determines the bans each team made in the live match
+<img width="180" height="330" alt="SideBans" src="https://github.com/user-attachments/assets/75d7e69b-e007-49e7-b45d-1d5e9a6ef357" />  
+
+Determines the champions' IDs banned in the live match and prints their corresponding name
+
+### 10. Determines the champions on each team in the live match
+<img width="448" height="361" alt="LiveMatchChampions" src="https://github.com/user-attachments/assets/56f66dc2-866b-4e98-bc83-909e156ade3c" />  
+
+Determines which team each player is on alongside their champion and PUUID, stores this data in a dictionary, and then displays their corresponding summoner name and tag alongside their current champion name
+
+### 10. Determines the mastery of every champion in the live game 
+<img width="493" height="328" alt="LiveMatchMasteries" src="https://github.com/user-attachments/assets/07309e42-f79c-4c4a-9cdb-d5ac72225465" />  
+
+Fetches the mastery data of all players in the game, determines which champion they're playing, matches it to their mastery, and also displays their ranking
+
+## Database Schema
+The persistence layer uses SQLite (`lol_data.db`) with foreign keys enabled. It models a **many-to-many** relationship between players and matches using a junction table (player_matches):
+
+```text
+┌─────────────────┐       ┌────────────────────┐       ┌─────────────────┐
+│     players     │       │   player_matches   │       │     matches     │
+├─────────────────┤       ├────────────────────┤       ├─────────────────┤
+│ puuid (PK)      │◄──┐   │ puuid (PK, FK)     │   ┌──►│ match_id (PK)   │
+│ summoner_name   │   └───┼ match_id (PK, FK)  ├───┘   │ game_creation   │
+│ summoner_tag    │       └────────────────────┘       │ json_data       │
+│ region          │                                    └─────────────────┘
+└─────────────────┘
+```
+## Getting Started
+
+### Prerequisites
+
+* Python 3.10+
+* A Riot Games API Key from the [Riot Developer Portal](https://developer.riotgames.com/)
+
+### Installation
+
+1. **Clone the repository:**
+   ```bash
+    git clone https://github.com/Alightenforce/League_of_Legends_win_probability_calculator.git
+    cd League_of_Legends_win_probability_calculator
+   ```
+
+2. **Create and activate a virtual environment:**
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows: venv\Scripts\activate
+   ```
+
+3. **Install dependencies:**
+   ```bash
+   pip install requests python-dotenv
+   ```
+
+4. **Configure environment variables:**
+   Create a `.env` file in the project root directory:
+   ```env
+   RIOT_API_KEY="RGAPI-your-actual-api-key"
+   ```
+
+5. **Initialize the SQLite database:**
+   Execute `DB.py` to create `lol_data.db` and initialize tables:
+   ```bash
+   python DB.py
+   ```
+## Engineering Trade-offs & Decisions
+* As I am limited in my API credits, I decided to implement a local caching layer that stores any games that have previously been queried. The point of this was to reduce redundant API calls but also to "bypass" the 100-match limit. As it's typically 100 API calls every 2 minutes, without a database, the maximum number of matches I could analyse would be 100 games, and any new data would disregard historical data, subsequently manipulating the data too. Consequently, the player will need to gradually increase the total_matches_wanted to achieve a large dataset. However, also due to this rate limit, I decided to allow only a maximum of 50 new games to be queried in one go to restrict API usage credits and ensure I don't go over 100 in 2 minutes (especially if the user also queried some live match APIs)
+* I also used lazy-loading and in-memory caching to prevent unnecessary network requests and reuse the same fetched information
+
+## Future Plans (To be implemented)
+* Add a GUI
+* Add some sort of logistic regression (or related) to estimate the player's win probability for the live match
+* Add unit tests
+* Add exception handling
 
 
 
