@@ -6,14 +6,15 @@ import time
 import climage
 from PIL import Image
 from io import BytesIO
+import logging
 
 import DB
-from Riot_API import Riot_API
+from Riot_API import Riot_API, RiotAPIError
 from Print_Stats import Print_Stats
 
 load_dotenv()
 API_KEY = os.getenv("RIOT_API_KEY")
-
+logger = logging.getLogger(__name__)
 BLUE_SIDE_ID = 100
 RED_SIDE_ID = 200
 MAX_NEW_API_CALLS = 50
@@ -122,7 +123,10 @@ class Player:
                 wins += 1
             else:
                 losses += 1
-        win_rate = wins / len(each_match_data)
+        if len(each_match_data) == 0:
+            win_rate = 0
+        else:
+            win_rate = wins / len(each_match_data)
         win_rate_percent = win_rate * 100
         return round(win_rate_percent, 2)
 
@@ -174,9 +178,11 @@ class Player:
         player_info_dict = {}
         try:
             data = self.api.get_active_game(self.region_code, self.puuid)
-        except:
-            print("Player is not in a live game or API call failed.")
-            return player_info_dict
+        except RiotAPIError as err:
+            if err.status_code == 404:
+                logger.info("No active game found.")
+                return {}
+            raise
         # print (data)
         participants = data["participants"]
         for index, participant in enumerate(participants):
@@ -226,11 +232,15 @@ class Player:
         puuid_to_all_masteries = {}
         for team, players in live_teams.items():
             for puuid in players:
-                mastery_data = self.api.get_mastery_data(self.region_code, puuid)
-                if "status" in mastery_data:
-                    mastery_data = []
-                puuid_to_all_masteries[puuid] = mastery_data
-
+                if puuid.startswith("Streamer_Mode_"):
+                    puuid_to_all_masteries[puuid] = []
+                    continue
+                try:
+                    mastery_data = self.api.get_mastery_data(self.region_code, puuid)
+                    puuid_to_all_masteries[puuid] = mastery_data
+                except RiotAPIError:
+                    logger.warning(f"No mastery data found for puuid {puuid}")
+                    puuid_to_all_masteries[puuid] = []
         return puuid_to_all_masteries
 
     def get_live_match_champion_masteries(self):
@@ -298,10 +308,10 @@ class Player:
     def get_live_player_champion (self) -> str:
         team_to_player_name_and_champion_dict = self.get_champion_and_player_on_each_team_in_live_match()
         for team, data_list in team_to_player_name_and_champion_dict.items():
-            for data in data_list:
+            for data in data_list.values():
                 if self.summoner_name + "#" + self.summoner_tag == data["username"]:
                     return data["champion_name"]
-        raise ValueError("Champion not found")
+        return None
 
     def print_live_player_champion(self):
         my_champion = self.get_live_player_champion()
@@ -309,7 +319,13 @@ class Player:
 
     def get_banned_champions_in_current_match(self) -> list:
         list_of_banned_champions_in_current_match = []
-        data = self.api.get_active_game(self.region_code, self.puuid)
+        try:
+            data = self.api.get_active_game(self.region_code, self.puuid)
+        except RiotAPIError as err:
+            if err.status_code == 404:
+                logger.info("No active game found.")
+                return []
+            raise
         banned_champions = data["bannedChampions"]
         for champions in banned_champions:
             champion_id_to_team = ((champions["championId"]), (champions["teamId"]))
@@ -326,7 +342,8 @@ class Player:
             if champion_id == -1:
                 champion_name = "No ban"
             else:
-                champion_name = dict_of_champions[champion_id]
+                champion_name = dict_of_champions.get(champion_id, f"Champion_{champion_id}")
+
             if team_id == BLUE_SIDE_ID:
                 bans_dict["blue_side"].append(champion_name)
             elif team_id == RED_SIDE_ID:
@@ -401,7 +418,7 @@ class Player:
             avg_kills = round((kills / games), 1)
             avg_deaths = round((deaths / games), 1)
             avg_assists = round((assists / games), 1)
-            avg_kda = round((avg_kills + avg_assists) / avg_deaths, 1)
+            avg_kda = round((avg_kills + avg_assists) / max(1,avg_deaths), 1)
 
             average_kda_per_champion[name] = {"Avg_Kills" : avg_kills, "Avg_Deaths" : avg_deaths, "Avg_Assists" : avg_assists, "Avg_KDA" : avg_kda}
         return average_kda_per_champion
@@ -500,8 +517,10 @@ class Player:
                 wins = stats["wins"]
                 losses = stats["losses"]
                 total_matches = wins + losses
-
-                win_rate = wins / total_matches
+                if total_matches == 0:
+                    win_rate = 0
+                else:
+                    win_rate = wins / total_matches
                 win_rate_percent = round(win_rate * 100, 1)
                 teammate_puuid_to_stats[teammate_puuid] = {
                     "wins": wins,
@@ -613,7 +632,10 @@ class Player:
             wins = stats["wins"]
             losses = stats["losses"]
             total_matches = stats["total_matches"]
-            win_rate = wins / total_matches
+            if total_matches == 0:
+                win_rate = 0
+            else:
+                 win_rate = wins / total_matches
             win_rate_percent = round(win_rate * 100, 1)
             champion_id_to_winrate[champion_id] ={
                 "wins" : wins,
