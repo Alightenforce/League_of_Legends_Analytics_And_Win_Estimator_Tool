@@ -126,7 +126,6 @@ The persistence layer uses SQLite (`lol_data.db`) with foreign keys enabled. It 
 * I also used lazy-loading and in-memory caching to prevent unnecessary network requests and reuse the same fetched information
 
 ## Future Plans (To be implemented)
-* Expand the GUI
 * Add some sort of logistic regression (or related) to estimate the player's win probability for the live match
 * Add unit tests
 
