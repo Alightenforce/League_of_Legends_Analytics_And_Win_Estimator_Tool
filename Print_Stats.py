@@ -15,7 +15,7 @@ class Print_Stats:
         print(f"Region: {player.region}")
         print(f"Region Code: {player.region_code}")
         print(f"Profile Picture ID: {player.pfp_id}")
-        print(f"Count: {player.count}")
+        print(f"Total Matches Wanted: {player.total_matches_wanted}")
         print(f"Version Number: {player.version_number}")
         print("--------------------")
 
