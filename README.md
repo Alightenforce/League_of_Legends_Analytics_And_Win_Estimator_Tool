@@ -7,6 +7,7 @@ This is a League of Legends analytics tool (and soon to be a win probability est
 ├── Riot_API.py      # Riot Games REST API handler & rate-limit logger
 ├── Player.py        # Calculation of various player statistics
 ├── Print_Stats.py   # CLI presentation & formatted terminal outputs
+├── constants.py     # Stores the constants used
 └── main.py          # Application entry point
 ```
 1. The main.py file initialises the player.
@@ -128,7 +129,6 @@ The persistence layer uses SQLite (`lol_data.db`) with foreign keys enabled. It 
 * Add a GUI
 * Add some sort of logistic regression (or related) to estimate the player's win probability for the live match
 * Add unit tests
-* Add exception handling
 
 
 
