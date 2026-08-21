@@ -7,6 +7,7 @@ import climage
 from PIL import Image
 from io import BytesIO
 import logging
+from constants import *
 
 import DB
 from Riot_API import Riot_API, RiotAPIError
@@ -15,9 +16,6 @@ from Print_Stats import Print_Stats
 load_dotenv()
 API_KEY = os.getenv("RIOT_API_KEY")
 logger = logging.getLogger(__name__)
-BLUE_SIDE_ID = 100
-RED_SIDE_ID = 200
-MAX_NEW_API_CALLS = 50
 
 class Player:
 
@@ -42,6 +40,8 @@ class Player:
         self.summoner_tag = summoner_tag
         self.region = region
         # self.count = count
+
+        self.update_profile()
 
     def update_profile(self):
         self.puuid = self.api.get_account_data(self.region, self.summoner_name, self.summoner_tag)["puuid"]

@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Create custom exception handling
 class RiotAPIError(Exception):
     def __init__(self, message, status_code=None):
-        super().__init__(message) # Calls the parent constructor (Exception) and passes the message variable into the parent class to deal with
+        super().__init__(message) # Calls the parent constructor (Exception) and passes the message variable into the parent constructor
         self.status_code = status_code
 
 class Riot_API:
@@ -44,24 +44,17 @@ class Riot_API:
 
             # Calculate the remaining on the page
             current_count = min(100, total_matches_wanted - len(all_match_ids))
-
-            link = (
-                f'https://{region}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids'
-                f'?start={start_index}&count={current_count}&api_key={self.api_key}'
-            )
-
+            link = f'https://{region}.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids?start={start_index}&count={current_count}&api_key={self.api_key}'
             page_ids = self.get_json(link)
 
             # Player doesn't have enough matches in their history
             if not page_ids or not isinstance(page_ids, list):
                 break
-
             all_match_ids.extend(page_ids)
 
             # Riot stop returning the player's history
             if len(page_ids) < current_count:
                 break
-
         return all_match_ids
 
     def get_match_detail(self, region: str, match_id: str):
@@ -78,10 +71,13 @@ class Riot_API:
 
     def get_json(self, link : str):
         try:
-            response = self.session.get(link, timeout=(3.05, 10)) # TCP packets are retransmitted at integer intervals, so making it slightly above a 3 ensures it can restransmit. The structure (3.05, 10) means 3.05 seconds wait time to establish a connection to the RIOT servers and 10 seconds for RIOT to send the information back to the program
+            # TCP packets are retransmitted at integer intervals, so making it slightly above a 3 ensures it can restransmit.
+            # The structure (3.05, 10) means 3.05 seconds wait time to establish a connection to the RIOT servers and 10 seconds for RIOT to send the information back to the program
+            response = self.session.get(link, timeout=(3.05, 10))
             app_calls = response.headers.get("X-App-Rate-Limit-Count")
             print(f"[Riot API Usage] -> {app_calls}")
-            response.raise_for_status() # Since python treats any response as valid, I need to raise for status to actually see if it's an error or valid data
+            # Since python treats any response as valid, I need to raise for status to actually see if it's an error or valid data and force an HTTPError
+            response.raise_for_status()
             return response.json()
 
         # Checks for timeouts
